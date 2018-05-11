@@ -10,6 +10,7 @@ import (
     // "io"
 )
 
+var version string = "HEAD"
 
 
 func netstat_info() [][]string {
@@ -65,12 +66,15 @@ func main() {
 
     table := uitable.New()  
     table.MaxColWidth = 50
-    table.AddRow("PROTO", "PORT", "PROCESS", "USER")
+    table.AddRow("lsports", "version", version, "")
+    table.AddRow("PORT", "PROTO", "PROCESS", "USER")
+    table.AddRow("====", "=====", "=======", "====")
 
     list_of_list_of_string := netstat_info()
     for _, v := range list_of_list_of_string {
         // fmt.Printf("%+q\n", v)
-        table.AddRow(v[0], v[1], v[2], v[3])
+
+        table.AddRow(v[1], v[0], v[2], v[3])
     }
     fmt.Println(table)
 
