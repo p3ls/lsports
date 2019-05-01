@@ -7,14 +7,19 @@ import (
     "bytes"
     "sort"
     "strings"
+    "runtime"
     "github.com/gosuri/uitable"
     "menteslibres.net/gosexy/to"
     // "io"
 )
 
+// windows support
+// https://commandwindows.com/netstat.htm
+// https://stackoverflow.com/questions/18059798/windows-batch-equivalent-of-fuser-k-folder
+
 var version = "HEAD"
 
-func Contains(a []string, x string) bool {
+func sliceContains(a []string, x string) bool {
     for _, n := range a {
         if x == n {
             return true
@@ -23,16 +28,16 @@ func Contains(a []string, x string) bool {
     return false
 }
 
-func TrimSuffix(s, suffix string) string {
+func trimSuffix(s, suffix string) string {
     if strings.HasSuffix(s, suffix) {
         s = s[:len(s)-len(suffix)]
     }
     return s
 }
 
-func fuser_info(proto string, port string) []string {
+func fuserInfo(proto string, port string) []string {
 
-    proto = TrimSuffix(proto, "6")    
+    proto = trimSuffix(proto, "6")    
     cmd := exec.Command("sudo", "fuser", "-a", "-v", fmt.Sprintf("%s/%s", port, proto))
     var out bytes.Buffer
     cmd.Stdout = &out
@@ -52,7 +57,7 @@ func fuser_info(proto string, port string) []string {
     return []string{}
 }
 
-func netstat_info() [][]string {
+func netstatInfo() [][]string {
     cmd := exec.Command("netstat", "-4", "-6", "--numeric", "--all")
     var out bytes.Buffer
     cmd.Stdout = &out
@@ -67,19 +72,17 @@ func netstat_info() [][]string {
 
         if (strings.HasPrefix(item, "tcp") || strings.HasPrefix(item, "udp")) {
             fields := strings.Fields(item) 
-            proto := TrimSuffix(fields[0], "6")
+            proto := trimSuffix(fields[0], "6")
             local_ip_port := fields[3]
             addr := strings.Split(local_ip_port, ":")
             port := addr[len(addr)-1]
-            // println(proto, port)
-
-            details := fuser_info(proto, port)
+            details := fuserInfo(proto, port)
             user := details[1]
-            // pid := details[2]
             process := details[4]
+            // pid := details[2]
 
             id := proto + port + process + user
-            if !Contains(string_results, id){
+            if !sliceContains(string_results, id){
                 results = append(results, []string{proto, port, process, user})
                 string_results = append(string_results, id)
             }
@@ -92,13 +95,17 @@ func netstat_info() [][]string {
 
 func main() {
 
+    if runtime.GOOS != "linux" {
+        log.Fatal("Only Linux is supported")
+    }
+
     table := uitable.New()  
     table.MaxColWidth = 50
-
     table.AddRow("PORT", "PROTO", "PROCESS", "USER")
 
-    items := netstat_info()
+    items := netstatInfo()
 
+    // sort items by port number ascending
     sort.SliceStable(items, func(i, j int) bool {
         porti := to.Int64(items[i][1])
         portj := to.Int64(items[j][1])
