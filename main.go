@@ -5,12 +5,11 @@ import (
     "log"
     "os/exec"
     "bytes"
+    "strconv"
     "sort"
     "strings"
     "runtime"
     "github.com/gosuri/uitable"
-    "menteslibres.net/gosexy/to"
-    // "io"
 )
 
 // windows support
@@ -57,32 +56,46 @@ func fuserInfo(proto string, port string) []string {
     return []string{}
 }
 
-func netstatInfo() [][]string {
-    cmd := exec.Command("netstat", "-4", "-6", "--numeric", "--all")
-    var out bytes.Buffer
-    cmd.Stdout = &out
+func toInt64(s string) int64 {
+    x, err := strconv.ParseInt(s, 10, 64)
+    if err != nil {
+        fmt.Println(err)
+        return 0
+    }
+    return x
+}
+
+func netstat() [][]string {
+    results := make([][]string, 0)
+    cmd := exec.Command("sudo", "netstat", "-4", "-6", "--numeric", "--all")
+    var stdout bytes.Buffer
+    var stderr bytes.Buffer
+    cmd.Stdout = &stdout
+    cmd.Stderr = &stderr
     err := cmd.Run()
     if err != nil {
-        log.Fatal(err)
+        fmt.Println(stderr.String())
+        fmt.Println(err)
+        return results
     }
-    lines := strings.Split(out.String(), "\n")
-    results := make([][]string, 0)
+    lines := strings.Split(stdout.String(), "\n")
+    
     string_results := make([]string, 0)
     for _, item := range lines {
 
         if (strings.HasPrefix(item, "tcp") || strings.HasPrefix(item, "udp")) {
-            fields := strings.Fields(item) 
-            proto := trimSuffix(fields[0], "6")
+            fields  := strings.Fields(item) 
+            proto   := trimSuffix(fields[0], "6")
             local_ip_port := fields[3]
-            addr := strings.Split(local_ip_port, ":")
-            port := addr[len(addr)-1]
+            addr    := strings.Split(local_ip_port, ":")
+            port    := addr[len(addr)-1]
             details := fuserInfo(proto, port)
-            user := details[1]
+            user    := details[1]
             process := details[4]
             // pid := details[2]
 
             id := proto + port + process + user
-            if !sliceContains(string_results, id){
+            if !sliceContains(string_results, id) {
                 results = append(results, []string{proto, port, process, user})
                 string_results = append(string_results, id)
             }
@@ -103,12 +116,14 @@ func main() {
     table.MaxColWidth = 50
     table.AddRow("PORT", "PROTO", "PROCESS", "USER")
 
-    items := netstatInfo()
+    items := netstat()
+    // fmt.Println(items)
+    // return
 
     // sort items by port number ascending
     sort.SliceStable(items, func(i, j int) bool {
-        porti := to.Int64(items[i][1])
-        portj := to.Int64(items[j][1])
+        porti := toInt64(items[i][1])
+        portj := toInt64(items[j][1])
         return porti < portj
     })
 
